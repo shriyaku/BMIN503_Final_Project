@@ -3,3 +3,6 @@ The problem this project will address is whether Twitter data can be used to und
 Twitter data available at https://github.com/thepanacealab/covid19_twitter
 OWID data available at https://github.com/owid/covid-19-data
 Country codes available at https://www.iban.com/country-codes
+
+
+Sample merged dataframe without tweet texts uploaded as well.
