@@ -1,30 +1,384 @@
 ---
 title: "BMIN503/EPID600 Project Template"
-author: "Your Name"
+author: "Shriya Kunatharaju"
 output: 
   html_document:
     theme: paper 
     highlight: tango
 ---
-```{r set-options, echo=FALSE, cache=FALSE}
+```{r set-options, echo=FALSE, cache=FALSE, warning = FALSE, message = FALSE}
 options(width = 400)
 ```  
 ***
-Use this template to complete your project throughout the course. Your Final Project presentation will be based on the contents of this document. Replace the title/name above and text below with your own, but keep the headers.
+
 
 ### Overview
-Give a brief a description of your project and its goal(s), what data you are using to complete it, and what three faculty/staff in different fields you have spoken to about your project with a brief summary of what you learned from each person. Include a link to your final project GitHub repository.
+I chose to study twitter sentiment in relation to the COVID-19 pandemic. Since twitter data is publicly available and could include geolocation, I wanted to see if new cases and new deaths in different countries could be generalized to make a model for twitter sentiment that can be tested as cases continue to increase.
+
+I chose a Penn team working with Twitter data  and a Microbiology faculty member, as to approach the data in different ways and get some disease expertise. Dr. Ari Klein explained how tweets are shared, Ivan Flores provided Python code to hydrate the tweets, and Dr. Frederic Bushman suggested using variant data though it ended up requiring more time to incorporate into this project.
+
+https://github.com/shriyaku/BMIN503_Final_Project
 
 
 ### Introduction 
-Describe the problem addressed, its significance, and some background to motivate the problem.
+The problem this project will address is whether Twitter data can be used to understand how people reacted to the COVID-19 pandemic and what factors led to a more negative or positive sentiment. If there are behaviors that predict negative reaction, that could perhaps be used to get a preemptive understanding of population health in the future.
 
-Explain why your problem is interdisciplinary, what fields can contribute to its understanding, and incorporate background related to what you learned from meeting with faculty/staff.
+I believe this problem is interdisciplinary because the severity of the crisis and urgency to find a solution led to people from different disciplines trying to answer the problem. Also being an issue that is affected by biological, social, racial, and cultural factors, there is a need to collaborate to find a holistic solution.
 
 
 ### Methods
-Describe the data used and general methodological approach. Subsequently, incorporate full R code necessary to retrieve and clean data, and perform analysis. Be sure to include a description of code so that others (including your future self) can understand what you are doing and why. 
+Tweets were obtained from the Public COVID Twitter Dataset published by the Panacea Lab (https://github.com/thepanacealab/covid19_twitter). The dataset includes tweet IDs, which need to be "hydrated" as per Twitter data sharing guidelines, so deleted tweets or tweets that are made private cannot be accessed at a later time. I hydrated the tweets in Python using the code below. Limited by processing speed and Twitter's cap on number of tweets that can be pulled using the API, I chose to try and hydrate 48 tweets from each day (two from every hour), that are in english and include a country code. I made the smaller tweet ID data sets in R using the code below.
+
+setwd("~/Desktop/Final/Jul 2020")
+file_list <- list.files()
+
+for (file in file_list){
+  if (!exists("dataset")){
+    dataset <- read.table(file, header=TRUE, sep="\t")
+  }
+
+  if (exists("dataset")){
+    temp_dataset <-read.table(file, header=TRUE, sep="\t")
+    dataset<-rbind(dataset, temp_dataset)
+    rm(temp_dataset)
+  }
+}
+
+jul_df <- distinct(dataset)
+
+jul_df_eng <- jul_df %>%
+  filter(lang == "en")
+
+jul_df_eng_count <- jul_df_eng %>%
+  filter(country_code != "NULL") %>%
+  filter(country_code != "")
+
+jul_df_eng_count_50 <- jul_df_eng_count %>%
+  mutate(hour = substr(time, 1, 2)) %>%
+  group_by(date, hour) %>%
+  slice_sample(n = 2)
+
+write.table(jul_df_eng_count_50, file = "jul_2020_tweets.tsv", row.names = F, sep = "\t")
+
+import tweepy
+import csv
+import pandas as pd
+
+
+CONSUMER_KEY = ""
+CONSUMER_SECRET = ""
+OAUTH_TOKEN = ""
+OAUTH_TOKEN_SECRET = ""
+
+def hydrate_tweets(tweet_id):
+    auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+    auth.set_access_token(OAUTH_TOKEN, OAUTH_TOKEN_SECRET)
+    api = tweepy.API(auth, wait_on_rate_limit=True)
+
+    try:
+        tweet_status = api.get_status(tweet_id)
+        tweet_text = tweet_status.text
+        tweet_text = tweet_text.replace('\n', '')
+        tweet_fav = tweet_status.favorite_count
+
+    except:
+        tweet_text = "e"
+        tweet_fav = "NA"
+
+    return (tweet_text, tweet_fav)
+
+
+if __name__ == "__main__":
+    tweets = pd.read_csv("jul_2020_tweets.tsv", delimiter='\t')
+    text = []
+    fav = []
+
+    for row_index, row in tweets.iterrows():
+
+        tweet_text, tweet_fav = hydrate_tweets(row['tweet_id'])
+        text.append(tweet_text)
+        fav.append(tweet_fav)
+
+    tweets['text'] = text
+    tweets['fav'] = fav
+    tweets.to_csv('tweets_jul_2020.tsv', index=False, header=True, sep='\t')
+
+hydrated tweets were then merged in R:
+
+jan_20 <- read.csv("tweets_jan_2020.tsv", sep ="\t") %>% select(-hour) #jan to march 2020
+jan_21 <- read.csv("tweets_jan_2021.tsv", sep ="\t") %>% select(-hour)
+feb_21 <- read.csv("tweets_feb_2021.tsv", sep ="\t") %>% select(-hour)
+mar_21 <- read.csv("tweets_mar_2021.tsv", sep ="\t") %>% select(-hour)
+apr_20 <- read.csv("tweets_apr_2020.tsv", sep ="\t") %>% select(-hour)
+apr_21 <- read.csv("tweets_apr_2021.tsv", sep ="\t") %>% select(-hour)
+may_20 <- read.csv("tweets_may_2020.tsv", sep ="\t") %>% select(-hour)
+may_21 <- read.csv("tweets_may_2021.tsv", sep ="\t") %>% select(-hour)
+jun_20 <- read.csv("tweets_jun_2020.tsv", sep ="\t") %>% select(-hour)
+jun_21 <- read.csv("tweets_jun_2021.tsv", sep ="\t") %>% select(-hour)
+jul_20 <- read.csv("tweets_jul_2020.tsv", sep ="\t") %>% select(-hour)
+jul_20_2 <- read.csv("tweets_jul_2020_1.tsv", sep ="\t") %>% select(-hour)
+jul_21 <- read.csv("tweets_jul_2021.tsv", sep ="\t") %>% select(-hour)
+aug_20 <- read.csv("tweets_aug_2020.tsv", sep ="\t") %>% select(-hour)
+aug_21 <- read.csv("tweets_aug_2021.tsv", sep ="\t") %>% select(-hour)
+sep_20 <- read.csv("tweets_sep_2020.tsv", sep ="\t") %>% select(-hour)
+sep_21 <- read.csv("tweets_sep_2021.tsv", sep ="\t") %>% select(-hour)
+oct_20 <- read.csv("tweets_oct_2020.tsv", sep ="\t") %>% select(-hour)
+oct_21 <- read.csv("tweets_oct_2021.tsv", sep ="\t") %>% select(-hour)
+nov_20 <- read.csv("tweets_nov_2020.tsv", sep ="\t") %>% select(-hour)
+dec_20 <- read.csv("tweets_dec_2020.tsv", sep ="\t") %>% select(-hour)
+
+merged_df <- bind_rows(jan_20,jan_21,feb_21,mar_21,apr_20,apr_21,may_20,may_21,jun_20,jun_21,
+                    jul_20,jul_20_2,jul_21,aug_20,aug_21,sep_20,sep_21,oct_20,oct_21,nov_20,dec_20) %>%
+  select(-user) %>%
+  mutate(date = as.Date(date, format = "%Y-%m-%d"))
+
+```{r eval = TRUE, message = FALSE,warning = FALSE}
+
+library(dplyr)
+library(tidytext)
+library(textdata)
+library(tidyverse)
+library(lubridate)
+library(tm)
+library("wordcloud")
+library("SnowballC")
+library("RColorBrewer")
+
+merged_df <- read.csv("merged_df.csv") %>% #reading in merged dataset
+  mutate(date = as.Date(date, format = "%Y-%m-%d"))
+
+#tweets that weren't available are labelled as "e", exploring if # of hydrated tweets are evenly spread:
+
+missing_df <- merged_df %>%
+  select(date, text) %>%
+  mutate(hydrate = ifelse(text == "e", "N", "Y"),
+         month = months(date), year = year(date)) %>%
+  group_by(month, year, hydrate) %>%
+  summarise(count = n()) %>%
+  mutate(month = factor(month, levels = c("January", "February", "March", "April",
+                              "May", "June", "July", "August", "September",
+                              "October", "November", "December")))
+
+ggplot(missing_df, aes(x=month, y=count, fill=hydrate))+
+  geom_bar(stat="identity", color="black")+
+  theme_minimal() +
+  facet_wrap(~year) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+#there seem to be enough hydrated tweets from each month, a couple tweets from november were 
+#included in the october dataset. these were used to train the models later, which may have caused 
+#some error.
+
+get_net_sentiment <- function(tweet){ #function to get net sentiment for each tweet
+  
+  tweet_text <- tweet
+  tweet_text_corpus <- Corpus(VectorSource(tweet_text))
+  tweet_text_corpus <- tm_map(tweet_text_corpus, content_transformer(function(x) iconv(x, to = 'UTF-8-MAC', sub =' byte')))
+  tweet_text_corpus <- tm_map(tweet_text_corpus, content_transformer(tolower))
+  tweet_text_corpus <- tm_map(tweet_text_corpus, removePunctuation)
+  tweet_text_corpus <- tm_map(tweet_text_corpus, removeNumbers)
+  removeURL <- function(x) gsub("http[[:alnum:]]*", "", x)
+  tweet_text_corpus <- tm_map(tweet_text_corpus, content_transformer(removeURL))
+  myStopwords <- c(stopwords(), "amia")
+  tweet_text_corpus <- tm_map(tweet_text_corpus, function(x) removeWords(x, myStopwords))
+  
+  y <- str_split(tweet_text_corpus, pattern = "\\s+")
+  
+  words <- as_tibble(y[[1]]) %>%
+    rename("word" = "value")
+  
+  table <- words %>% 
+    inner_join(.,get_sentiments("afinn"), by = "word") %>%  #chose AFINN lexicon since it return a range of numbers vs categories, i thought the added precision would be better for the lm models
+    count(word, value, sort = TRUE)
+  
+  net_sentiment <- sum(table$value *table$n)
+  return(net_sentiment)
+}
+
+# hydrated_df <- merged_df %>%
+#   filter(text != "e") %>% rowwise() %>%
+#   mutate(net_sentiment = get_net_sentiment(text))
+
+
+hydrated_df <- read.csv("twitter_data.csv") %>% #reading in data since applying function on dataset takes time
+  mutate(date = as.Date(date, format = "%Y-%m-%d"))
+  
+
+#number of tweets used:
+nrow(hydrated_df)
+
+#lang and country data was added to the panacea dataset in july 2020, so values are NA:
+sum(is.na(hydrated_df$lang))
+sum(is.na(hydrated_df$country_code))
+
+covid_df <- read.csv("owid-covid-data.csv") #OWID Dataset with daily new cases and deaths globally and by country
+
+covid_df <- covid_df %>%
+  mutate(date = as.Date(date, format = "%m/%d/%y"))
+
+country_code <- read.csv("country_code.csv") #country code key to match codes in the 2 datasets https://www.iban.com/country-codes
+
+global_covid <- covid_df %>%
+  filter(location == "World") %>%
+  select(date:total_vaccinations) %>%
+  rename("total_cases_global" = "total_cases", "new_cases_global" = "new_cases", "total_deaths_global" = "total_deaths",
+         "new_deaths_global" = "new_deaths", "total_cases_per_million_global" = "total_cases_per_million",
+         "new_cases_per_million_global" = "new_cases_per_million", "total_vaccinations_global" = "total_vaccinations") %>%
+  mutate(date = as.Date(date, format = "%m/%d/%y"))
+
+merged_df2 <- hydrated_df %>%
+  left_join(.,country_code, by = "country_code") %>%
+  left_join(.,covid_df, by = c("date", "iso_code")) %>%
+  left_join(.,global_covid, by = "date")   
+
+#seeing if number of likes on tweet is related to sentiment:
+
+ggplot(data = merged_df2, aes(x = net_sentiment, y = fav)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Tweet net sentiment vs no. of likes")
+
+
+#seeing if time of day affected tweet net sentiment:
+
+merged_df3 <- merged_df2 %>%
+  select(net_sentiment, time) %>%
+  mutate(time = as.POSIXct(time, format = "%H:%M:%S")) %>%
+  mutate(time = hour(time)) %>%
+  mutate(time = as.factor(time))
+
+ggplot(data = merged_df3, aes(x = time, y = net_sentiment)) +
+  geom_point(alpha = 0.1) +
+  theme_minimal() +
+  labs(title = "Time of Day (Hour) vs Tweet Net Sentiment")
+
+
+#word clouds for high and low net_sentiment scores
+
+pos_tweets <- merged_df2 %>%
+  filter(net_sentiment > 3) %>%
+  select(text)
+
+tweet_text <- pos_tweets$text
+tweet_text_corpus <- Corpus(VectorSource(tweet_text))
+tweet_text_corpus <- tm_map(tweet_text_corpus, content_transformer(tolower))
+tweet_text_corpus <- tm_map(tweet_text_corpus, removePunctuation)
+tweet_text_corpus <- tm_map(tweet_text_corpus, removeNumbers)
+removeURL <- function(x) gsub("http[[:alnum:]]*", "", x)
+tweet_text_corpus <- tm_map(tweet_text_corpus, content_transformer(removeURL))
+myStopwords <- c(stopwords(), "amia")
+tweet_text_corpus <- tm_map(tweet_text_corpus, function(x) removeWords(x, myStopwords))
+
+wordcloud(tweet_text_corpus, min.freq = 5, max.words = 100, random.order = FALSE, colors = brewer.pal(8, "Dark2"))
+
+
+neg_tweets <- merged_df2 %>%
+  filter(net_sentiment < -3) %>%
+  select(text)
+
+tweet_text <- neg_tweets$text
+tweet_text_corpus <- Corpus(VectorSource(tweet_text))
+tweet_text_corpus <- tm_map(tweet_text_corpus, content_transformer(tolower))
+tweet_text_corpus <- tm_map(tweet_text_corpus, removePunctuation)
+tweet_text_corpus <- tm_map(tweet_text_corpus, removeNumbers)
+removeURL <- function(x) gsub("http[[:alnum:]]*", "", x)
+tweet_text_corpus <- tm_map(tweet_text_corpus, content_transformer(removeURL))
+myStopwords <- c(stopwords(), "amia")
+tweet_text_corpus <- tm_map(tweet_text_corpus, function(x) removeWords(x, myStopwords))
+
+wordcloud(tweet_text_corpus, min.freq = 5, max.words = 100, random.order = FALSE, colors = brewer.pal(8, "Dark2"))
+
+
+#model for covid cases/ deaths and net sentiment
+
+model_df <- merged_df2 %>%
+  select(net_sentiment, new_cases, new_deaths, total_vaccinations, 
+         new_cases_global, new_deaths_global, total_vaccinations_global)
+
+ggplot(data = model_df, aes(x = new_cases, y = net_sentiment)) +
+  geom_point(alpha = 0.2) + labs(title = "new_cases vs net sentiment")
+
+ggplot(data = model_df, aes(x = new_deaths, y = net_sentiment)) +
+  geom_point(alpha = 0.2) + labs(title = "new_deaths vs net sentiment")
+
+ggplot(data = model_df, aes(x = new_cases_global, y = net_sentiment)) +
+  geom_point(alpha = 0.2) + labs(title = "new_cases_global vs net sentiment")
+
+ggplot(data = model_df, aes(x = new_deaths_global, y = net_sentiment)) +
+  geom_point(alpha = 0.2) + labs(title = "new_deaths_global vs net sentiment")
+
+
+summary(lm(net_sentiment ~ new_cases_global + new_deaths_global, data = model_df))
+summary(lm(net_sentiment ~ new_cases + new_deaths, data = model_df))
+summary(lm(net_sentiment ~ new_cases + new_deaths + total_vaccinations, data = model_df)) #using this as it has lowest r squared values
+
+#net_sentiment = -2.025e-06*(new_cases) +  8.939e-05*(new_deaths) - 2.693e-10*(total_vaccinations) + 2.773e-01
+
+
+#reading in november and december 2021 data to test the model
+
+covid_df_nov <- covid_df %>%
+  select(iso_code, date, new_cases,new_deaths,total_vaccinations)
+
+covid_df2 <- read.csv("owid-covid-data2.csv")  %>%
+  mutate(date = as.Date(date, format = "%m/%d/%y")) %>%
+  rbind(covid_df_nov)
+
+global_covid_nov <- global_covid %>%
+  select(date, new_cases_global, new_deaths_global, total_vaccinations_global)
+
+global_covid2 <- covid_df2 %>%
+  filter(iso_code == "OWID_WRL") %>%
+  rename("new_cases_global" = "new_cases", "new_deaths_global" = "new_deaths",
+         "total_vaccinations_global" = "total_vaccinations") %>%
+  mutate(date = as.Date(date, format = "%m/%d/%y")) %>%
+  select(-iso_code) %>%
+  rbind(global_covid_nov)
+
+test_tweets <- read.csv("tweets_test_2021.tsv", sep = "\t") %>%
+  filter(text != "e")
+
+#no. of tweets to test model on:
+nrow(test_tweets)
+
+test_tweets_sentiment <- test_tweets %>% rowwise() %>%
+   mutate(net_sentiment = get_net_sentiment(text))
+
+test_df_merged <- test_tweets_sentiment %>%
+  select(date, country_code, net_sentiment) %>%
+  mutate(date = as.Date(date, format = "%Y-%m-%d")) %>%
+  left_join(.,country_code, by = "country_code") %>%
+  left_join(.,covid_df2, by = c("date", "iso_code")) %>%
+  left_join(.,global_covid2, by = c("date")) %>%
+  distinct()
+
+test_model_df <- test_df_merged %>%
+  mutate(sentiment_expected = -2.025e-06*(new_cases) +  8.939e-05*(new_deaths) - 2.693e-10*(total_vaccinations) + 2.773e-01) %>%
+  select(date, net_sentiment, sentiment_expected) %>%
+  gather(.,sentiment,value,net_sentiment:sentiment_expected)
+
+ggplot(data = test_model_df, aes(x = date, y = value, color = sentiment)) +
+  geom_point() + labs(title = "Expected vs Real Sentiment on Twitter Nov-Dec 2021")
+
+
+tweet_text <- test_tweets$text
+tweet_text_corpus <- Corpus(VectorSource(tweet_text))
+tweet_text_corpus <- tm_map(tweet_text_corpus, content_transformer(tolower))
+tweet_text_corpus <- tm_map(tweet_text_corpus, removePunctuation)
+tweet_text_corpus <- tm_map(tweet_text_corpus, removeNumbers)
+removeURL <- function(x) gsub("http[[:alnum:]]*", "", x)
+tweet_text_corpus <- tm_map(tweet_text_corpus, content_transformer(removeURL))
+myStopwords <- c(stopwords(), "amia")
+tweet_text_corpus <- tm_map(tweet_text_corpus, function(x) removeWords(x, myStopwords))
+
+wordcloud(tweet_text_corpus, min.freq = 5, max.words = 100, random.order = FALSE, colors = brewer.pal(8, "Dark2"))
+```
 
 
 ### Results
-Describe your results and include relevant tables, plots, and code/comments used to obtain them. End with a brief conclusion of your findings related to the question you set out to address. You can include references if you'd like, but this is not required.
+1. Positive vs Negative sentiment did not have an effect on how many likes a tweet got
+2. Time of day in this dataset did not effect the sentiment of the tweet
+3. Word clouds for Positive vs Negative sentiment tweets were different
+4. This model for net_sentiment (net_sentiment = -2.025e-06*(new_cases) +  8.939e-05*(new_deaths) - 2.693e-10*(total_vaccinations) + 2.773e-01) did not accurately predict net_sentiment for tweets after Nov 1. The calculated net_sentiment was an order of magnitude lower than what was observed, likely do to the higher values of total_vaccination. To avoid larger numbers in the training dataset having an outsized effedt (days when there were high new cases/ deaths), future work should try % change in cases/ deaths.
+5. The Nov/Dec 2021 word cloud now includes omicron
+
